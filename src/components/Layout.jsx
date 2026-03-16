@@ -28,7 +28,11 @@ useEffect(() => {
     { path: '/jobs', label: 'Posizioni aperte' },
     { path: '/referrals', label: 'I miei referral' },
     { path: '/leaderboard', label: 'Classifica' },
-    ...(ruolo === 'hr' || ruolo === 'admin' ? [{ path: '/hr/jobs', label: '⚙️ HR' }] : [])
+    ...(ruolo === 'hr' || ruolo === 'admin' ? [{ path: '/hr/jobs', label: '⚙️ HR' }] : []),
+    ...(ruolo === 'hr' || ruolo === 'admin' ? [
+    { path: '/hr/jobs', label: '⚙️ Posizioni HR' },
+    { path: '/hr/referrals', label: '⚙️ Candidature HR' }
+    ] : [])
   ]
 
 

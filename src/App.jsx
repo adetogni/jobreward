@@ -10,6 +10,8 @@ import HrRoute from './components/HrRoute'
 import Layout from './components/Layout'
 import Referrals from './pages/Referrals'
 import ReferralForm from './pages/ReferralForm'
+import HrReferrals from './pages/hr/HrReferrals'
+import Leaderboard from './pages/Leaderboard'
 
 function App() {
   return (
@@ -19,6 +21,9 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/jobs" element={
           <ProtectedRoute><Layout><Jobs /></Layout></ProtectedRoute>
+        } />
+        <Route path="/leaderboard" element={
+        <ProtectedRoute><Layout><Leaderboard /></Layout></ProtectedRoute>
         } />
         <Route path="/jobs/:id" element={
           <ProtectedRoute><Layout><JobDetail /></Layout></ProtectedRoute>
@@ -34,6 +39,9 @@ function App() {
         } />
           <Route path="/jobs/:id/referral" element={
           <ProtectedRoute><Layout><ReferralForm /></Layout></ProtectedRoute>
+        } />
+        <Route path="/hr/referrals" element={
+          <ProtectedRoute><HrRoute><Layout><HrReferrals /></Layout></HrRoute></ProtectedRoute>
         } />
         <Route path="*" element={<Navigate to="/login" />} />
       </Routes>
