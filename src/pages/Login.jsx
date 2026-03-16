@@ -55,7 +55,7 @@ function Login() {
         </button>
       </form>
     </div>
-  )
+  ) 
 }
 
 export default Login
