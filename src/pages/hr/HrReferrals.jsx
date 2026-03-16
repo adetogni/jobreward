@@ -27,18 +27,40 @@ function HrReferrals() {
     carica()
   }, [])
 
-  async function aggiornaStato(id, nuovoStato) {
-    const { error } = await supabase
-      .from('referrals')
-      .update({ stato: nuovoStato })
-      .eq('id', id)
+async function aggiornaStato(id, nuovoStato) {
+  const referral = referrals.find(r => r.id === id)
 
-    if (!error) {
-      setReferrals(referrals.map(r =>
-        r.id === id ? { ...r, stato: nuovoStato } : r
-      ))
+  const { error } = await supabase
+    .from('referrals')
+    .update({ stato: nuovoStato })
+    .eq('id', id)
+
+  if (error) return
+
+  setReferrals(referrals.map(r =>
+    r.id === id ? { ...r, stato: nuovoStato } : r
+  ))
+
+  if (['in_valutazione', 'negato', 'assunto'].includes(nuovoStato)) {
+    const emailDestinatario = referral.profiles?.email
+
+    if (emailDestinatario) {
+      await supabase.functions.invoke('invia-email', {
+        body: {
+          tipo: 'cambio_stato',
+          destinatario: emailDestinatario,
+          dati: {
+            stato: nuovoStato,
+            nome_candidato: referral.nome_candidato,
+            cognome_candidato: referral.cognome_candidato,
+            titolo_job: referral.job_postings?.titolo,
+            referral_fee: referral.job_postings?.referral_fee
+          }
+        }
+      })
     }
   }
+}
 
   async function aggiornaApprovazione(id, valore) {
     const { error } = await supabase
