@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import ShareButtons from '../components/ShareButtons'
 
 function JobDetail() {
   const { id } = useParams()
@@ -83,7 +84,11 @@ function JobDetail() {
           <p className="text-sm text-gray-600">{JSON.stringify(job.modalita_pagamento)}</p>
         </div>
       )}
-
+        <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-4">
+        <h3 className="font-semibold text-gray-900 mb-1">Condividi questa posizione</h3>
+        <p className="text-sm text-gray-400 mb-2">Condividi con i tuoi contatti e guadagna il referral fee</p>
+        <ShareButtons job={job} />
+        </div>
       {/* Bottone referral */}
       <button
         onClick={() => navigate(`/jobs/${id}/referral`)}

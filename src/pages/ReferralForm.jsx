@@ -9,9 +9,11 @@ function ReferralForm() {
   const [caricamento, setCaricamento] = useState(true)
   const [invio, setInvio] = useState(false)
   const [errore, setErrore] = useState('')
+  const [cvFile, setCvFile] = useState(null)
   const [form, setForm] = useState({
     nome_candidato: '',
     cognome_candidato: '',
+    tipo: 'profilo_linkedin',
     linkedin_url: '',
     relazione: ''
   })
@@ -41,14 +43,80 @@ function ReferralForm() {
     setErrore('')
 
     const { data: { user } } = await supabase.auth.getUser()
+    const oggi = new Date().toISOString().split('T')[0]
 
+    // Controllo 1 — max 5 referral al giorno
+    const { count: countOggi } = await supabase
+      .from('referrals')
+      .select('*', { count: 'exact', head: true })
+      .eq('inviato_da', user.id)
+      .gte('created_at', `${oggi}T00:00:00`)
+      .lte('created_at', `${oggi}T23:59:59`)
+
+    if (countOggi >= 5) {
+      setErrore('Hai raggiunto il limite di 5 segnalazioni al giorno. Riprova domani!')
+      setInvio(false)
+      return
+    }
+
+    // Controllo 2 — max 3 "trovato online"
+    if (form.relazione === 'trovato_online') {
+      const { count: countOnline } = await supabase
+        .from('referrals')
+        .select('*', { count: 'exact', head: true })
+        .eq('inviato_da', user.id)
+        .eq('relazione', 'trovato_online')
+
+      if (countOnline >= 3) {
+        setErrore('Puoi segnalare al massimo 3 profili trovati online.')
+        setInvio(false)
+        return
+      }
+    }
+
+    // Controllo 3 — duplicato
+    const { count: countDuplicato } = await supabase
+      .from('referrals')
+      .select('*', { count: 'exact', head: true })
+      .eq('inviato_da', user.id)
+      .eq('job_posting_id', id)
+      .eq('nome_candidato', form.nome_candidato)
+      .eq('cognome_candidato', form.cognome_candidato)
+
+    if (countDuplicato > 0) {
+      setErrore('Hai già segnalato questo candidato per questa posizione.')
+      setInvio(false)
+      return
+    }
+
+    // Upload CV se presente
+    let cv_url = null
+    if (form.tipo === 'cv_caricato' && cvFile) {
+      const estensione = cvFile.name.split('.').pop()
+      const nomeFile = `${user.id}/${Date.now()}.${estensione}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('cv')
+        .upload(nomeFile, cvFile)
+
+      if (uploadError) {
+        setErrore('Errore nel caricamento del CV: ' + uploadError.message)
+        setInvio(false)
+        return
+      }
+
+      cv_url = nomeFile
+    }
+
+    // Inserisci referral
     const { error } = await supabase.from('referrals').insert({
       job_posting_id: id,
       inviato_da: user.id,
       nome_candidato: form.nome_candidato,
       cognome_candidato: form.cognome_candidato,
-      tipo: 'profilo_linkedin',
-      linkedin_url: form.linkedin_url,
+      tipo: form.tipo,
+      linkedin_url: form.tipo === 'profilo_linkedin' ? form.linkedin_url : null,
+      cv_url,
       relazione: form.relazione,
       privacy_confermata: false
     })
@@ -75,7 +143,7 @@ function ReferralForm() {
     {
       value: 'trovato_online',
       label: 'Trovato il profilo online',
-      descrizione: 'Ho trovato il profilo su LinkedIn o altrove, non lo conosco'
+      descrizione: 'Profilo trovato su LinkedIn o altrove — max 3 segnalazioni di questo tipo'
     }
   ]
 
@@ -94,7 +162,6 @@ function ReferralForm() {
         ← Torna alla posizione
       </button>
 
-      {/* Job summary */}
       <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 mb-6 flex items-center justify-between">
         <div>
           <p className="text-xs text-indigo-400 font-medium mb-0.5">Stai segnalando per</p>
@@ -133,19 +200,77 @@ function ReferralForm() {
             </div>
           </div>
 
-          {/* LinkedIn URL */}
+          {/* Tipo segnalazione */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Profilo LinkedIn</label>
-            <input
-              name="linkedin_url" value={form.linkedin_url}
-              onChange={handleChange} required
-              placeholder="https://linkedin.com/in/mario-rossi"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-            <p className="text-xs text-gray-400 mt-1">
-              Inserisci il link al profilo LinkedIn del candidato
-            </p>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Tipo di segnalazione</label>
+            <div className="grid grid-cols-2 gap-3">
+              <label className={`flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${
+                form.tipo === 'profilo_linkedin'
+                  ? 'border-indigo-400 bg-indigo-50'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}>
+                <input
+                  type="radio" name="tipo" value="profilo_linkedin"
+                  checked={form.tipo === 'profilo_linkedin'}
+                  onChange={handleChange}
+                  className="accent-indigo-600"
+                />
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Profilo LinkedIn</p>
+                  <p className="text-xs text-gray-400">Condividi il link</p>
+                </div>
+              </label>
+              <label className={`flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${
+                form.tipo === 'cv_caricato'
+                  ? 'border-indigo-400 bg-indigo-50'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}>
+                <input
+                  type="radio" name="tipo" value="cv_caricato"
+                  checked={form.tipo === 'cv_caricato'}
+                  onChange={handleChange}
+                  className="accent-indigo-600"
+                />
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Carica CV</p>
+                  <p className="text-xs text-gray-400">PDF o Word</p>
+                </div>
+              </label>
+            </div>
           </div>
+
+          {/* LinkedIn URL o Upload CV */}
+          {form.tipo === 'profilo_linkedin' ? (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Profilo LinkedIn</label>
+              <input
+                name="linkedin_url" value={form.linkedin_url}
+                onChange={handleChange} required
+                placeholder="https://linkedin.com/in/mario-rossi"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+          ) : (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">CV del candidato</label>
+              <input
+                type="file"
+                accept=".pdf,.doc,.docx"
+                onChange={e => setCvFile(e.target.files[0])}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                Formati accettati: PDF, DOC, DOCX — max 5MB
+              </p>
+              <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 mt-2">
+                <p className="text-xs text-amber-700">
+                  <span className="font-semibold">Privacy:</span> Il candidato riceverà una mail per
+                  confermare il trattamento dei suoi dati.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Tipo relazione */}
           <div>
@@ -163,9 +288,7 @@ function ReferralForm() {
                   }`}
                 >
                   <input
-                    type="radio"
-                    name="relazione"
-                    value={opt.value}
+                    type="radio" name="relazione" value={opt.value}
                     checked={form.relazione === opt.value}
                     onChange={handleChange}
                     className="mt-0.5 accent-indigo-600"
@@ -178,14 +301,6 @@ function ReferralForm() {
                 </label>
               ))}
             </div>
-          </div>
-
-          {/* Avviso privacy */}
-          <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
-            <p className="text-xs text-amber-700">
-              <span className="font-semibold">Privacy:</span> Il candidato riceverà una mail per confermare
-              il trattamento dei suoi dati prima che la candidatura venga processata.
-            </p>
           </div>
 
           {errore && <p className="text-red-500 text-sm">{errore}</p>}

@@ -158,16 +158,27 @@ function HrReferrals() {
                   </p>
 
                   {/* LinkedIn */}
-                  {r.linkedin_url && (
-                    <a
-                      href={r.linkedin_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-indigo-500 hover:underline mt-1 inline-block"
+                  {r.tipo === 'profilo_linkedin' && r.linkedin_url && (
+                        <a
+                        href={r.linkedin_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-indigo-500 hover:underline mt-1 inline-block"
                     >
-                      Vedi profilo LinkedIn →
+                        Vedi profilo LinkedIn →
                     </a>
-                  )}
+                    )}
+                    {r.tipo === 'cv_caricato' && r.cv_url && (
+                    <button
+                        onClick={async () => {
+                        const { data } = await supabase.storage.from('cv').createSignedUrl(r.cv_url, 60)
+                        if (data?.signedUrl) window.open(data.signedUrl, '_blank')
+                        }}
+                        className="text-xs text-indigo-500 hover:underline mt-1 inline-block"
+                    >
+                        Scarica CV →
+                    </button>
+                    )}
 
                   <p className="text-xs text-gray-400 mt-2">
                     {new Date(r.created_at).toLocaleDateString('it-IT')}
