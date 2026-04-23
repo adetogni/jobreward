@@ -17,7 +17,7 @@ function HrReferrals() {
 
       const { data, error } = await supabase
         .from('referrals')
-        .select('*, job_postings(titolo, referral_fee), profiles(nome, cognome, azienda)')
+        .select('*, job_postings(titolo, referral_fee), profiles(nome, cognome, azienda,email)')
         .order('created_at', { ascending: false })
 
       if (!error) setReferrals(data)
@@ -43,22 +43,30 @@ async function aggiornaStato(id, nuovoStato) {
 
   if (['in_valutazione', 'negato', 'assunto'].includes(nuovoStato)) {
     const emailDestinatario = referral.profiles?.email
-
+console.log('Email destinatario:', emailDestinatario) // Log dell'email destinatario
     if (emailDestinatario) {
-      await supabase.functions.invoke('invia-email', {
-        body: {
-          tipo: 'cambio_stato',
-          destinatario: emailDestinatario,
-          dati: {
-            stato: nuovoStato,
-            nome_candidato: referral.nome_candidato,
-            cognome_candidato: referral.cognome_candidato,
-            titolo_job: referral.job_postings?.titolo,
-            referral_fee: referral.job_postings?.referral_fee
-          }
-        }
-      })
+  console.log('Invio email a:', emailDestinatario)
+  
+  const { data: { session } } = await supabase.auth.getSession()
+  
+  const { data, error } = await supabase.functions.invoke('invia-email', {
+    headers: {
+      Authorization: `Bearer ${session.access_token}`
+    },
+    body: {
+      tipo: 'cambio_stato',
+      destinatario: emailDestinatario,
+      dati: {
+        stato: nuovoStato,
+        nome_candidato: referral.nome_candidato,
+        cognome_candidato: referral.cognome_candidato,
+        titolo_job: referral.job_postings?.titolo,
+        referral_fee: referral.job_postings?.referral_fee
+      }
     }
+  })
+  console.log('Risposta funzione:', data, error)
+}
   }
 }
 
